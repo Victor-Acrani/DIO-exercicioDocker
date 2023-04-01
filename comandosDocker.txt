@@ -1,0 +1,136 @@
+comando docker
+
+docker pull <nome da imagem> (faz o download da imagem)
+docker pull <nome da imagem>:<tag> (faz o download da imagem com a tag assinalada)
+
+docker images (lista todas as imagens)
+docker ps (lista todos os conteiners em run)
+docker ps -a (lista os ultimos conteiners que estavam em run)
+
+docker run <nome da imagem> (cria e executa o container)
+docker run --name <dar uma nome> <nome da imagem>(cria e executa o container)
+docker run <nome da imagem> sleep <tempo> (cria e executa o container por x tempo)
+docker run -it <nome da imagem> (cria e executa o container com um terminal de forma interativa)
+
+docker run -dit <nome da imagem> (cria e executa o container em background com um terminal de forma interativa) -> docker exec -it <id container> /bin/bash (entra no container)
+
+docker start <nome do container> (inicia a execusão do container)
+docker stop <nome do container> (para a execusão do container)
+
+docker rm <id do container> (deleta o container)
+docker rmi <nome da imagem> (deleta a imagem)
+
+docker cp <file>  <container>:<path> (copia um arquivo de fora para path do container)
+docker run <container> <outro comando> (executa o container + o comando)
+
+docker cp <container>:<path> <path+nome do arquivo> (copia arquivo do container para outro lugar)
+
+
+// exemplo de container do mysql
+docker run -e MYSQL_ROOT_PASSWORD=Senh123 --name mysql-A -d -p 3306:3306 mysql
+//acessar db
+docker exec -it mysql-A bash
+// acesso ao banco 
+mysql -u root -p --protocol=tcp
+// inspecionar container 
+docker inspect mysql-A
+
+
+// montando mount um local de armazenamento (os arquivos ficam salvos no pc e o docker lê e escrive nas pasta)
+(usar docker inspect para encontrar "type":"volume" e em seguida o "destination", local onde são salvos os arquivos do DB)
+docker run -e MYSQL_ROOT_PASSWORD=Senha123 --name=mysql-A -d -p 3306:3306 --volume=<path PC>:<path container>
+docker run -e MYSQL_ROOT_PASSWORD=Senha123 --name=mysql-A -d -p 3306:3306 --volume=/data/mysql-A:/var/lib/mysql
+
+tipos de mount BIND(eu escolho o path), NAMED(fica na pasta /var/lib/docker), VOLUME(fica na pasta /var/lib/docker/volumes) mais indicado
+
+// mount bind
+docker run -dti --mount  type=bind,src=/data/debian-A,dst=/data debian
+docker run -dti --mount  type=bind,src=/data/debian-A,dst=/data,ro debian (o container tem permissão apenas de leitura)
+
+// mount volume
+docker volume ls
+docker volume create <nome volume>
+cd /var/lib/docker/volumes (está salvo aqui o volume)
+docker run -dti --mount type=volume,src=<nome volume>,dst=/data --name debian-B debian (cria container com debian e mount do tipo volume)
+
+docker rm -f <nome container> (força a deleção do container)
+docker volume prune (deleta todos os volumes que não estão em uso)
+
+docker stats <nome container> (retorna os estatus do container)
+docker update <nome container> -m 128M --cpus 0.2 (limita a memoria em 128MB e a 20% do núcleo do processador)
+docker info
+docker logs <nome container>
+docker top <nome container> (mostra quais serviços estão ligados)
+
+
+// network
+docker network ls
+docker network inspect bridge (os containers ficam em modo bridge com o host) (bridge é a rede padrão quando nao se especifica)
+docker create network <nome da rede>
+docker run -dti --name Ubuntu-A --network minha-rede ubuntu
+
+// criar imagem
+docker image build -t app-go:1.0 .
+
+// *** exemplo docker file *************************************************************************
+
+# Specify the base image needed for run a given go application
+FROM golang
+
+SHELL ["/bin/bash", "-c"]
+
+# Create an /app directory within a given image that will hold the application source files
+RUN mkdir /app
+
+# Copy everything in the root directory into /app directory
+ADD . /app
+
+# Specify that now any further commands will be executed inside /app directory
+WORKDIR /app
+
+# Retrieve application dependencies.
+# Expecting to copy go.mod and if present go.sum.
+COPY go.* ./
+RUN go mod download;
+
+# Run go build to compile the binary executable of the Go program
+RUN go build -o main .
+
+# Run the web service on container startup.
+CMD ["/app/main"]
+
+//******************************************************************************************************************
+
+docker-compose.yml
+====================
+
+version: '3.8'
+
+services:
+  mysqlsrv:
+    image: mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: "Senha123"
+      MYSQL_DATABASE: "testedb"
+    ports:
+      - "3306:3306"
+    volumes:
+      - /data/mysql-C:/var/lib/mysql
+    networks:
+      - minha-rede
+
+  adminer:
+    image: adminer
+    ports:
+      - 8080:8080
+    networks:
+      - minha-rede
+
+networks: 
+  minha-rede:
+    driver: bridge
+
+
+
+# docker-compose up -d
+
